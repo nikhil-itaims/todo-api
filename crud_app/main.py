@@ -1,11 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from pydantic import BaseModel
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Static Todo App")
 
 class Todo(BaseModel):
     name: str
-    desciption: str
+    description: str
 
 todo_list = []
 
@@ -38,6 +40,8 @@ async def all_todo():
             "error_message": None,
             "data": todo_list
         }
+        
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
@@ -47,44 +51,41 @@ async def all_todo():
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
 
 @app.get("/todo/{id}")
 async def get_todo(id: int):
     try:
         data = todo_list[id]
 
-        if data:
-            response = {
-                "status": True, 
-                "message": "Todo data get successfully",
-                "error_message": None,
-                "data": data
-            }
-        
-        else:
-            response = {
-                "status": True, 
-                "message": "Todo data not found",
-                "error_message": None,
-                "data": data
-            } 
-            return response, 404
+        response = {
+            "status": True, 
+            "message": "Todo data get successfully",
+            "error_message": None,
+            "data": data
+        }
+
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
             "status": True, 
-            "message": "Something went wrong",
+            "message": "Todo data not found",
             "error_message": str(e),
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
 
-@app.post("/add-todo")
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
+
+@app.post("/todo")
 async def add_todo(todo: Todo):
     try:
         todo_list.append(todo)
+
         response = {
             "status": True, 
             "message": "Todo added successfully.",
@@ -92,6 +93,8 @@ async def add_todo(todo: Todo):
             "data": todo
         }
 
+        response = jsonable_encoder(response)
+
     except Exception as e:
         response = {
             "status": True, 
@@ -99,10 +102,11 @@ async def add_todo(todo: Todo):
             "error_message": str(e),
             "data": None
         }
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
 
-    return response
+    return JSONResponse(content=response, status_code=status.HTTP_201_CREATED)
 
-@app.put("/update-todo/{id}")
+@app.put("/todo/{id}")
 async def update_todo(id: int, todo: Todo):
     try:
         todo_list[id] = todo
@@ -112,6 +116,7 @@ async def update_todo(id: int, todo: Todo):
             "error_message": None,
             "data": todo
         }
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
@@ -120,10 +125,11 @@ async def update_todo(id: int, todo: Todo):
             "error_message": str(e),
             "data": None
         }
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
 
-    return response
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
 
-@app.delete("/delete-todo/{id}")
+@app.delete("/todo/{id}")
 async def delete_todo(id: int):
     try:
         todo_list.pop(id)
@@ -133,6 +139,7 @@ async def delete_todo(id: int):
             "error_message": None,
             "data": None
         }
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
@@ -142,4 +149,6 @@ async def delete_todo(id: int):
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
