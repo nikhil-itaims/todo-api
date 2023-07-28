@@ -6,7 +6,7 @@
 pip install -r requirements.txt
 ```
 
-### TO start the crud app
+### To start the crud app
 ```
 cd crud_app
 uvicorn main:app --reload
