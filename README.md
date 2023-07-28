@@ -1,4 +1,5 @@
 # Simple todo app with FastApi
+For simple todo apis without database connection checkout branch to static-todos
 
 ### Install all the requirements
 
