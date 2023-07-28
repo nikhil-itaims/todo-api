@@ -1,145 +1,172 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from typing import List
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy.orm import Session
+from crud_app import crud, models, schemas
+from crud_app.database import SessionLocal, engine
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
-app = FastAPI(title="Static Todo App")
+models.Base.metadata.create_all(bind=engine)
 
-class Todo(BaseModel):
-    name: str
-    desciption: str
+app = FastAPI()
 
-todo_list = []
-
-@app.get("/", description="This is main route of application.")
-async def index():
+def get_db():
+    db = SessionLocal()
     try:
-        response = {
-            "status": True, 
-            "message": "Simple todo api using FastApi.",
-            "error_message": None,
-            "data": None
-        }
+        yield db
+    finally:
+        db.close()
 
-    except Exception as e:
-        response = {
-            "status": True, 
-            "message": "Something went wrong.",
-            "error_message": str(e),
-            "data": None
-        }
-
-    return response
-
-@app.get("/todo")
-async def all_todo():
+@app.get("/todo/", response_model=List[schemas.Todo])
+def get_todos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     try:
+        todos = crud.get_todos(db, skip=skip, limit=limit)
         response = {
             "status": True, 
             "message": "List of todos.",
             "error_message": None,
-            "data": todo_list
+            "data": todos
         }
-
-    except Exception as e:
-        response = {
-            "status": True, 
-            "message": "Something went wrong",
-            "error_message": str(e),
-            "data": None
-        }
-
-    return response
-
-@app.get("/todo/{id}")
-async def get_todo(id: int):
-    try:
-        data = todo_list[id]
-
-        if data:
-            response = {
-                "status": True, 
-                "message": "Todo data get successfully",
-                "error_message": None,
-                "data": data
-            }
         
-        else:
-            response = {
-                "status": True, 
-                "message": "Todo data not found",
-                "error_message": None,
-                "data": data
-            } 
-            return response, 404
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
-            "status": True, 
+            "status": False, 
             "message": "Something went wrong",
             "error_message": str(e),
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
 
-@app.post("/add-todo")
-async def add_todo(todo: Todo):
+@app.post("/todo/", response_model=schemas.Todo)
+def create_user(todo: schemas.TodoCreate, db: Session = Depends(get_db)):
     try:
-        todo_list.append(todo)
+        todo_data = crud.create_todo(db=db, todo=todo)
         response = {
             "status": True, 
             "message": "Todo added successfully.",
             "error_message": None,
-            "data": todo
+            "data": todo_data
         }
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
-            "status": True, 
+            "status": False, 
             "message": "Something went wrong",
             "error_message": str(e),
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_201_CREATED)
 
-@app.put("/update-todo/{id}")
-async def update_todo(id: int, todo: Todo):
+@app.get("/todo/{id}", response_model=schemas.Todo)
+def read_todo(id: int, db: Session = Depends(get_db)):
     try:
-        todo_list[id] = todo
+        todo = crud.get_todo(db, todo_id=id)
+        if todo is None:
+            response = {
+                "status": True, 
+                "message": "Todo not found.",
+                "error_message": None,
+                "data": None
+            }
+
+            return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+
         response = {
-            "status": True, 
-            "message": "Todo updated successfully.",
-            "error_message": None,
-            "data": todo
-        }
+                "status": True, 
+                "message": "Todo data found.",
+                "error_message": None,
+                "data": todo
+            }
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
-            "status": True, 
-            "message": "Something went wrong.",
+            "status": False, 
+            "message": "Something went wrong",
             "error_message": str(e),
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
 
-@app.delete("/delete-todo/{id}")
-async def delete_todo(id: int):
+# TODO work remaining from update todo
+@app.put("/todo/{id}", response_model=schemas.Todo)
+def update_todo(id: int, db: Session = Depends(get_db)):
     try:
-        todo_list.pop(id)
+        todo = crud.get_todo(db, todo_id=id)
+        if todo is None:
+            response = {
+                "status": True, 
+                "message": "Todo not found.",
+                "error_message": None,
+                "data": None
+            }
+
+            return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+        
+        todo_data = crud.update_todo(db=db, todo=todo)
         response = {
-            "status": True, 
-            "message": "Todo deleted successfully.",
-            "error_message": None,
-            "data": None
-        }
+                "status": True, 
+                "message": "Todo updated successfully.",
+                "error_message": None,
+                "data": todo_data
+            }
+        response = jsonable_encoder(response)
 
     except Exception as e:
         response = {
-            "status": True, 
-            "message": "Something went wrong.",
+            "status": False, 
+            "message": "Something went wrong",
             "error_message": str(e),
             "data": None
         }
 
-    return response
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
+
+@app.delete("/todo/{id}", response_model=schemas.Todo)
+def delete_todo(id: int, db: Session = Depends(get_db)):
+    try:
+        todo = crud.get_todo(db, todo_id=id)
+        if todo is None:
+            response = {
+                "status": True, 
+                "message": "Todo not found.",
+                "error_message": None,
+                "data": None
+            }
+
+            return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+
+        todo_data = crud.delete_todo(db=db, todo_id=id)
+        response = {
+                "status": True, 
+                "message": "Todo deleted successfully.",
+                "error_message": None,
+                "data": todo_data
+            }
+        response = jsonable_encoder(response)
+
+    except Exception as e:
+        response = {
+            "status": False, 
+            "message": "Something went wrong",
+            "error_message": str(e),
+            "data": None
+        }
+
+        return JSONResponse(content=response, status_code=status.HTTP_400_BAD_REQUEST)
+    
+    return JSONResponse(content=response, status_code=status.HTTP_200_OK)
